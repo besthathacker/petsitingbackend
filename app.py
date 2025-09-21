@@ -1,12 +1,21 @@
 from flask import Flask, request, render_template
 import os
 import time
+import smtplib
+from email.mime.text import MIMEText
 
 app = Flask(__name__)
 
 BOOKING_FILE = "bookings.txt"
 TEMP_DIR = "booking_temp"
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Email-to-SMS configuration
+SMTP_SERVER = "smtp.gmail.com"  # Change if needed
+SMTP_PORT = 587
+EMAIL_USER = os.environ.get("EMAIL_USER")        # Your email address
+EMAIL_PASS = os.environ.get("EMAIL_PASS")        # Your email password or app password
+SMS_TO = "2503515498@vmobile.ca"                # Your Virgin Mobile number
 
 @app.route("/")
 def index():
@@ -39,6 +48,22 @@ def booking():
     # Append new booking
     with open(BOOKING_FILE, "a") as f:
         f.write(f"Booking {booking_number}\t{email}\t{phone}\t{service}\t{postal}\n")
+
+    # Send SMS via email
+    sms_body = f"New Booking {booking_number}\nEmail: {email}\nPhone: {phone}\nService: {service}\nPostal: {postal}"
+    msg = MIMEText(sms_body)
+    msg["From"] = EMAIL_USER
+    msg["To"] = SMS_TO
+    msg["Subject"] = f"Booking {booking_number}"
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, SMS_TO, msg.as_string())
+        server.quit()
+    except Exception as e:
+        print("Failed to send SMS:", e)
 
     return f"Booking {booking_number} received.", 200
 
