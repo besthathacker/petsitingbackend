@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Dream Team Pet Sitting Booking</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -18,13 +19,21 @@
         <div id="responseMsg"></div>
     </div>
 
+    <!-- AI Widget -->
+    <div id="ai-widget">
+        <div id="ai-header">PetGPT Assistant</div>
+        <div id="ai-messages"></div>
+        <input id="ai-input" placeholder="Ask me anything..." />
+        <button id="ai-send">Send</button>
+    </div>
+
     <script>
+        // Booking submission
         const form = document.getElementById("bookingForm");
         const responseDiv = document.getElementById("responseMsg");
 
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
-
             const email = document.getElementById("emailInput").value.trim();
             const phone = document.getElementById("phoneInput").value.trim();
             const service = document.getElementById("serviceInput").value.trim();
@@ -35,14 +44,34 @@
                 body: new URLSearchParams({ email, phone, service, postal_code: postal })
             });
 
-            if (response.ok) {
-                const result = await response.text();
-                responseDiv.innerText = result;
-                form.reset();
-            } else {
-                responseDiv.innerText = await response.text();
-            }
+            responseDiv.innerText = await response.text();
+            form.reset();
         });
+
+        // PetGPT AI in-browser using transformers.js
+        const aiMessages = document.getElementById("ai-messages");
+        const aiInput = document.getElementById("ai-input");
+        const aiSend = document.getElementById("ai-send");
+
+        async function loadAI() {
+            window.model = await window.Transformers.load("Xenova/gpt2"); // Small GPT2 for browser
+        }
+
+        async function sendMessage() {
+            const input = aiInput.value.trim();
+            if (!input) return;
+            aiMessages.innerHTML += `<div class="user-msg">You: ${input}</div>`;
+            aiInput.value = "";
+
+            const output = await window.model.generate(input, { max_new_tokens: 50 });
+            aiMessages.innerHTML += `<div class="ai-msg">PetGPT: ${output.generated_text}</div>`;
+            aiMessages.scrollTop = aiMessages.scrollHeight;
+        }
+
+        aiSend.addEventListener("click", sendMessage);
+        aiInput.addEventListener("keydown", (e) => { if(e.key === "Enter") sendMessage(); });
+
+        loadAI();
     </script>
 </body>
 </html>
