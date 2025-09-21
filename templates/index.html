@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <title>Dream Team Pet Sitting Booking</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 50px; }
-        label { display: block; margin-top: 10px; }
-        button { margin-top: 20px; padding: 10px; }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Book a Pet Sitting Service</h1>
-    <form id="bookingForm">
-        <label>Email: <input type="email" id="emailInput" required></label>
-        <label>Phone: <input type="text" id="phoneInput" required></label>
-        <label>Service: <input type="text" id="serviceInput" required></label>
-        <label>Postal Code: <input type="text" id="postalInput" required></label>
-        <button type="submit">Submit Booking</button>
-    </form>
+    <div class="container">
+        <h1>Book a Pet Sitting Service</h1>
+        <form id="bookingForm">
+            <label>Email: <input type="email" id="emailInput" required></label>
+            <label>Phone: <input type="text" id="phoneInput" required></label>
+            <label>Service: <input type="text" id="serviceInput" required></label>
+            <label>Postal Code: <input type="text" id="postalInput" required></label>
+            <button type="submit">Submit Booking</button>
+        </form>
+        <div id="responseMsg"></div>
+    </div>
 
     <script>
         const form = document.getElementById("bookingForm");
+        const responseDiv = document.getElementById("responseMsg");
+
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
 
@@ -34,9 +35,13 @@
                 body: new URLSearchParams({ email, phone, service, postal_code: postal })
             });
 
-            const result = await response.text();
-            alert(result);
-            form.reset();
+            if (response.ok) {
+                const result = await response.text();
+                responseDiv.innerText = result;
+                form.reset();
+            } else {
+                responseDiv.innerText = await response.text();
+            }
         });
     </script>
 </body>
