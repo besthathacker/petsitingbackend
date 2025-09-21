@@ -136,24 +136,25 @@
   });
 
   // --- Transformers.js AI ---
-  let model;
+  let chatPipeline;
   async function loadModel() {
     chatMessages.innerHTML = "Loading AI model...";
-    model = await window.transformers.AutoModelForCausalLM.from_pretrained("gpt2");
+    // Load GPT-2 pipeline for text-generation in the browser
+    chatPipeline = await window.transformers.pipeline('text-generation', 'gpt2');
     chatMessages.innerHTML = "PetGPT ready! 🐾";
   }
   loadModel();
 
   sendBtn.addEventListener('click', async () => {
     const text = userInput.value.trim();
-    if (!text || !model) return;
+    if (!text || !chatPipeline) return;
 
     const userMsg = document.createElement('div');
     userMsg.textContent = "You: " + text;
     chatMessages.appendChild(userMsg);
 
     // Generate AI response
-    const output = await model.generate(text, { max_new_tokens: 50 });
+    const output = await chatPipeline(text, { max_new_tokens: 50 });
     const aiResponse = output[0].generated_text.replace(text, "");
 
     const aiMsg = document.createElement('div');
@@ -164,6 +165,5 @@
     userInput.value = '';
   });
 </script>
-
 </body>
 </html>
