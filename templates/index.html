@@ -1,77 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Dream Team Pet Sitting Booking</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Dream Team Pet Sitting</title>
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+
+    /* Chat bubble */
+    #petgpt-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #ff6f61;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Chat window */
+    #petgpt-chat {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 300px;
+      height: 400px;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    #chat-log {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+
+    #chat-input {
+      display: flex;
+    }
+
+    #chat-input input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-top: 1px solid #ccc;
+      outline: none;
+    }
+
+    #chat-input button {
+      padding: 10px;
+      border: none;
+      background: #ff6f61;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Book a Pet Sitting Service</h1>
-        <form id="bookingForm">
-            <label>Email: <input type="email" id="emailInput" required></label>
-            <label>Phone: <input type="text" id="phoneInput" required></label>
-            <label>Service: <input type="text" id="serviceInput" required></label>
-            <label>Postal Code: <input type="text" id="postalInput" required></label>
-            <button type="submit">Submit Booking</button>
-        </form>
-        <div id="responseMsg"></div>
+  <h1>Dream Team Pet Sitting</h1>
+  <p>Book your trusted pet sitter in Vernon, BC!</p>
+
+  <!-- Booking Form -->
+  <form action="/booking" method="POST">
+    <label>Email: <input type="email" name="email" required></label><br>
+    <label>Phone: <input type="text" name="phone" required></label><br>
+    <label>Service: 
+      <select name="service" required>
+        <option value="Dog Walking">Dog Walking</option>
+        <option value="Cat Sitting">Cat Sitting</option>
+        <option value="Pet Boarding">Pet Boarding</option>
+      </select>
+    </label><br>
+    <label>Postal Code: <input type="text" name="postal_code" required></label><br>
+    <button type="submit">Book Now</button>
+  </form>
+
+  <!-- PetGPT button -->
+  <button id="petgpt-button">🐾</button>
+
+  <!-- PetGPT chat window -->
+  <div id="petgpt-chat">
+    <div id="chat-log"></div>
+    <div id="chat-input">
+      <input type="text" id="user-input" placeholder="Ask PetGPT...">
+      <button id="send-btn">Send</button>
     </div>
+  </div>
 
-    <!-- AI Widget -->
-    <div id="ai-widget">
-        <div id="ai-header">PetGPT Assistant</div>
-        <div id="ai-messages"></div>
-        <input id="ai-input" placeholder="Ask me anything..." />
-        <button id="ai-send">Send</button>
-    </div>
+  <script>
+    // Load GPT-2 once
+    let pipeline;
+    (async () => {
+      pipeline = await window.transformers.pipeline("text-generation", "Xenova/gpt2");
+    })();
 
-    <script>
-        // Booking submission
-        const form = document.getElementById("bookingForm");
-        const responseDiv = document.getElementById("responseMsg");
+    // UI logic
+    const chatBox = document.getElementById("petgpt-chat");
+    const button = document.getElementById("petgpt-button");
+    const log = document.getElementById("chat-log");
+    const input = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
 
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const email = document.getElementById("emailInput").value.trim();
-            const phone = document.getElementById("phoneInput").value.trim();
-            const service = document.getElementById("serviceInput").value.trim();
-            const postal = document.getElementById("postalInput").value.trim();
+    button.addEventListener("click", () => {
+      chatBox.style.display = chatBox.style.display === "none" ? "flex" : "none";
+    });
 
-            const response = await fetch("/booking", {
-                method: "POST",
-                body: new URLSearchParams({ email, phone, service, postal_code: postal })
-            });
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      log.innerHTML += `<div><b>You:</b> ${text}</div>`;
+      input.value = "";
 
-            responseDiv.innerText = await response.text();
-            form.reset();
-        });
+      // AI reply
+      if (pipeline) {
+        const output = await pipeline(text, { max_length: 50 });
+        const reply = output[0].generated_text.replace(text, "").trim();
+        log.innerHTML += `<div><b>PetGPT:</b> ${reply}</div>`;
+        log.scrollTop = log.scrollHeight;
+      } else {
+        log.innerHTML += `<div><b>PetGPT:</b> (loading… try again in a moment)</div>`;
+      }
+    }
 
-        // PetGPT AI in-browser using transformers.js
-        const aiMessages = document.getElementById("ai-messages");
-        const aiInput = document.getElementById("ai-input");
-        const aiSend = document.getElementById("ai-send");
-
-        async function loadAI() {
-            window.model = await window.Transformers.load("Xenova/gpt2"); // Small GPT2 for browser
-        }
-
-        async function sendMessage() {
-            const input = aiInput.value.trim();
-            if (!input) return;
-            aiMessages.innerHTML += `<div class="user-msg">You: ${input}</div>`;
-            aiInput.value = "";
-
-            const output = await window.model.generate(input, { max_new_tokens: 50 });
-            aiMessages.innerHTML += `<div class="ai-msg">PetGPT: ${output.generated_text}</div>`;
-            aiMessages.scrollTop = aiMessages.scrollHeight;
-        }
-
-        aiSend.addEventListener("click", sendMessage);
-        aiInput.addEventListener("keydown", (e) => { if(e.key === "Enter") sendMessage(); });
-
-        loadAI();
-    </script>
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keypress", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
 </body>
 </html>
