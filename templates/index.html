@@ -100,7 +100,7 @@
 </div>
 
 <script type="module">
-  import * as transformers from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.2/dist/transformers.min.js';
+  import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.3';
 </script>
 <script>
   // --- Booking Form ---
@@ -142,7 +142,9 @@
   async function loadModel() {
     chatMessages.innerHTML = "Loading AI model...";
     // Load GPT-2 pipeline for text-generation in the browser
-    const model = await transformers.AutoModelForCausalLM.from_pretrained("gpt2");
+    const pipe = await pipeline('text-generation', 'gpt2');
+    const output = await pipe('Hello, PetGPT! ', { max_new_tokens: 50 });
+    console.log(output);
     chatMessages.innerHTML = "PetGPT ready! 🐾";
   }
   loadModel();
