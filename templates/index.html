@@ -1,145 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Dream Team Pet Sitting</title>
-  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.0/dist/transformers.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-
-    /* Chat bubble */
-    #petgpt-button {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #ff6f61;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-
-    /* Chat window */
-    #petgpt-chat {
-      display: none;
-      position: fixed;
-      bottom: 90px;
-      right: 20px;
-      width: 300px;
-      height: 400px;
-      border: 2px solid #ccc;
-      border-radius: 10px;
-      background: #fff;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-      overflow: hidden;
-      flex-direction: column;
-    }
-
-    #chat-log {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-      font-size: 14px;
-    }
-
-    #chat-input {
-      display: flex;
-    }
-
-    #chat-input input {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-top: 1px solid #ccc;
-      outline: none;
-    }
-
-    #chat-input button {
-      padding: 10px;
-      border: none;
-      background: #ff6f61;
-      color: white;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dream Team Pet Sitting</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    background-color: #f0f8ff;
+  }
+  .container {
+    padding: 1rem;
+    max-width: 500px;
+    margin: auto;
+  }
+  h1 { text-align: center; }
+  
+  /* Booking Form */
+  form { display: flex; flex-direction: column; gap: 0.5rem; }
+  input, button { padding: 0.5rem; font-size: 1rem; }
+  button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
+  
+  /* Chat Bubble */
+  #chatBubble {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px; height: 60px;
+    background-color: #ffcc00;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  #chatWindow {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 300px;
+    max-height: 400px;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  }
+  #chatMessages {
+    flex: 1;
+    padding: 0.5rem;
+    overflow-y: auto;
+    font-size: 0.9rem;
+  }
+  #chatInput {
+    display: flex;
+    border-top: 1px solid #ccc;
+  }
+  #userInput {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    font-size: 1rem;
+  }
+  #sendBtn {
+    padding: 0.5rem;
+    border: none;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+  }
+</style>
 </head>
 <body>
-  <h1>Dream Team Pet Sitting</h1>
-  <p>Book your trusted pet sitter in Vernon, BC!</p>
 
-  <!-- Booking Form -->
-  <form action="/booking" method="POST">
-    <label>Email: <input type="email" name="email" required></label><br>
-    <label>Phone: <input type="text" name="phone" required></label><br>
-    <label>Service: 
-      <select name="service" required>
-        <option value="Dog Walking">Dog Walking</option>
-        <option value="Cat Sitting">Cat Sitting</option>
-        <option value="Pet Boarding">Pet Boarding</option>
-      </select>
-    </label><br>
-    <label>Postal Code: <input type="text" name="postal_code" required></label><br>
+<div class="container">
+  <h1>Dream Team Pet Sitting Booking</h1>
+  <form id="bookingForm">
+    <input type="email" name="email" placeholder="Your Email" required>
+    <input type="text" name="phone" placeholder="Phone Number" required>
+    <input type="text" name="service" placeholder="Service Required" required>
+    <input type="text" name="postal_code" placeholder="Postal Code" required>
     <button type="submit">Book Now</button>
   </form>
+  <div id="bookingResult"></div>
+</div>
 
-  <!-- PetGPT button -->
-  <button id="petgpt-button">🐾</button>
+<!-- Chat Bubble -->
+<div id="chatBubble">🐾</div>
 
-  <!-- PetGPT chat window -->
-  <div id="petgpt-chat">
-    <div id="chat-log"></div>
-    <div id="chat-input">
-      <input type="text" id="user-input" placeholder="Ask PetGPT...">
-      <button id="send-btn">Send</button>
-    </div>
+<!-- Chat Window -->
+<div id="chatWindow">
+  <div id="chatMessages"></div>
+  <div id="chatInput">
+    <input type="text" id="userInput" placeholder="Talk to PetGPT...">
+    <button id="sendBtn">Send</button>
   </div>
+</div>
 
-  <script>
-    // Load GPT-2 once
-    let pipeline;
-    (async () => {
-      pipeline = await window.transformers.pipeline("text-generation", "Xenova/gpt2");
-    })();
+<script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js"></script>
+<script>
+  // --- Booking Form ---
+  const form = document.getElementById('bookingForm');
+  const result = document.getElementById('bookingResult');
 
-    // UI logic
-    const chatBox = document.getElementById("petgpt-chat");
-    const button = document.getElementById("petgpt-button");
-    const log = document.getElementById("chat-log");
-    const input = document.getElementById("user-input");
-    const sendBtn = document.getElementById("send-btn");
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const data = new URLSearchParams(formData);
 
-    button.addEventListener("click", () => {
-      chatBox.style.display = chatBox.style.display === "none" ? "flex" : "none";
-    });
-
-    async function sendMessage() {
-      const text = input.value.trim();
-      if (!text) return;
-      log.innerHTML += `<div><b>You:</b> ${text}</div>`;
-      input.value = "";
-
-      // AI reply
-      if (pipeline) {
-        const output = await pipeline(text, { max_length: 50 });
-        const reply = output[0].generated_text.replace(text, "").trim();
-        log.innerHTML += `<div><b>PetGPT:</b> ${reply}</div>`;
-        log.scrollTop = log.scrollHeight;
-      } else {
-        log.innerHTML += `<div><b>PetGPT:</b> (loading… try again in a moment)</div>`;
-      }
+    try {
+      const res = await fetch("/booking", {
+        method: "POST",
+        body: data
+      });
+      const text = await res.text();
+      result.textContent = text;
+      form.reset();
+    } catch(err) {
+      result.textContent = "Error sending booking.";
+      console.error(err);
     }
+  });
 
-    sendBtn.addEventListener("click", sendMessage);
-    input.addEventListener("keypress", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-  </script>
+  // --- Chat Bubble & Window ---
+  const chatBubble = document.getElementById('chatBubble');
+  const chatWindow = document.getElementById('chatWindow');
+  const chatMessages = document.getElementById('chatMessages');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  chatBubble.addEventListener('click', () => {
+    chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+  });
+
+  // --- Transformers.js AI ---
+  let model;
+  async function loadModel() {
+    chatMessages.innerHTML = "Loading AI model...";
+    model = await window.transformers.AutoModelForCausalLM.from_pretrained("gpt2");
+    chatMessages.innerHTML = "PetGPT ready! 🐾";
+  }
+  loadModel();
+
+  sendBtn.addEventListener('click', async () => {
+    const text = userInput.value.trim();
+    if (!text || !model) return;
+
+    const userMsg = document.createElement('div');
+    userMsg.textContent = "You: " + text;
+    chatMessages.appendChild(userMsg);
+
+    // Generate AI response
+    const output = await model.generate(text, { max_new_tokens: 50 });
+    const aiResponse = output[0].generated_text.replace(text, "");
+
+    const aiMsg = document.createElement('div');
+    aiMsg.textContent = "PetGPT: " + aiResponse;
+    chatMessages.appendChild(aiMsg);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    userInput.value = '';
+  });
+</script>
+
 </body>
 </html>
