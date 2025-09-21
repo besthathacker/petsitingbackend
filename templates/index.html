@@ -142,7 +142,7 @@
   async function loadModel() {
     chatMessages.innerHTML = "Loading AI model...";
     // Load GPT-2 pipeline for text-generation in the browser
-    chatPipeline = await window.transformers.pipeline('text-generation', 'gpt2');
+    const model = await transformers.AutoModelForCausalLM.from_pretrained("gpt2");
     chatMessages.innerHTML = "PetGPT ready! 🐾";
   }
   loadModel();
