@@ -138,33 +138,54 @@
   });
 
   // --- Transformers.js AI ---
-  let chatPipeline;
+  const chatMessages = document.getElementById('chatMessages');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  let pipe = null;
+
   async function loadModel() {
     chatMessages.innerHTML = "Loading AI model...";
-    // Load GPT-2 pipeline for text-generation in the browser
-    const pipe = await pipeline('text-generation', 'gpt2');
-    const output = await pipe('Hello, PetGPT! ', { max_new_tokens: 50 });
-    console.log(output);
-    chatMessages.innerHTML = "PetGPT ready! 🐾";
+    try {
+      pipe = await pipeline('text-generation', 'gpt2');
+      chatMessages.innerHTML = "PetGPT ready! 🐾";
+    } catch (err) {
+      chatMessages.innerHTML = "Error loading model:<br>" + err.toString();
+      console.error("Model load error:", err);
+    }
   }
+
   loadModel();
 
   sendBtn.addEventListener('click', async () => {
     const text = userInput.value.trim();
-    if (!text || !chatPipeline) return;
+    if (!text) return;
 
     const userMsg = document.createElement('div');
     userMsg.textContent = "You: " + text;
     chatMessages.appendChild(userMsg);
 
-    // Generate AI response
-    const output = await chatPipeline(text, { max_new_tokens: 50 });
-    const aiResponse = output[0].generated_text.replace(text, "");
+    if (!pipe) {
+      const errorMsg = document.createElement('div');
+      errorMsg.textContent = "Error: Model not loaded.";
+      chatMessages.appendChild(errorMsg);
+      return;
+    }
 
-    const aiMsg = document.createElement('div');
-    aiMsg.textContent = "PetGPT: " + aiResponse;
-    chatMessages.appendChild(aiMsg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    try {
+      const output = await pipe(text, { max_new_tokens: 50 });
+      const aiResponse = output[0].generated_text.replace(text, "");
+
+      const aiMsg = document.createElement('div');
+      aiMsg.textContent = "PetGPT: " + aiResponse;
+      chatMessages.appendChild(aiMsg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } catch (err) {
+      const errorMsg = document.createElement('div');
+      errorMsg.textContent = "Error during generation:<br>" + err.toString();
+      chatMessages.appendChild(errorMsg);
+      console.error("Generation error:", err);
+    }
 
     userInput.value = '';
   });
