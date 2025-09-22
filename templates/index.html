@@ -108,7 +108,7 @@ async function loadAI() {
 
   try {
     chatMessages.innerHTML = "Loading GPT-2 model...";
-    const pipe = await pipeline('text-generation', 'gpt2');
+    const pipe = await pipeline('text-generation', 'Xenova/gpt2');
     chatMessages.innerHTML = "PetGPT ready! 🐾";
 
     document.getElementById('sendBtn').addEventListener('click', async () => {
