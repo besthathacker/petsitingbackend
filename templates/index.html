@@ -16,12 +16,12 @@
     margin: auto;
   }
   h1 { text-align: center; }
-  
+
   /* Booking Form */
   form { display: flex; flex-direction: column; gap: 0.5rem; }
   input, button { padding: 0.5rem; font-size: 1rem; }
   button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
-  
+
   /* Chat Bubble */
   #chatBubble {
     position: fixed;
@@ -33,6 +33,7 @@
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    font-size: 1.5rem;
   }
   #chatWindow {
     position: fixed;
@@ -94,93 +95,87 @@
 <div id="chatWindow">
   <div id="chatMessages"></div>
   <div id="chatInput">
-    <input type="text" id="userInput" placeholder="Talk to PetGPT...">
+    <input type="text" id="userInput" placeholder="Talk to PetGPT or type search: ...">
     <button id="sendBtn">Send</button>
   </div>
 </div>
 
 <script type="module">
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest';
 
-// --- Booking Form ---
-const form = document.getElementById('bookingForm');
-const result = document.getElementById('bookingResult');
+let generator;
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
 
-form.addEventListener('submit', async (e) => {
+// Load GPT-2
+(async () => {
+  addMessage("System", "Loading AI model...");
+  generator = await pipeline('text-generation', 'Xenova/gpt2');
+  addMessage("System", "PetGPT ready! 🐾");
+})();
+
+function addMessage(sender, text) {
+  const msg = document.createElement('div');
+  msg.textContent = sender + ": " + text;
+  chatMessages.appendChild(msg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Booking Form
+document.getElementById('bookingForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const formData = new FormData(form);
+  const formData = new FormData(e.target);
   const data = new URLSearchParams(formData);
-
   try {
-    const res = await fetch("/booking", {
-      method: "POST",
-      body: data
-    });
+    const res = await fetch("/booking", { method: "POST", body: data });
     const text = await res.text();
-    result.textContent = text;
-    form.reset();
+    document.getElementById('bookingResult').textContent = text;
+    e.target.reset();
   } catch(err) {
-    result.textContent = "Error sending booking.";
-    console.error(err);
+    document.getElementById('bookingResult').textContent = "Error sending booking.";
   }
 });
 
-// --- Chat Bubble & Window ---
-const chatBubble = document.getElementById('chatBubble');
-const chatWindow = document.getElementById('chatWindow');
-const chatMessages = document.getElementById('chatMessages');
-const userInput = document.getElementById('userInput');
-const sendBtn = document.getElementById('sendBtn');
-
-chatBubble.addEventListener('click', () => {
+// Chat Bubble
+document.getElementById('chatBubble').addEventListener('click', () => {
+  const chatWindow = document.getElementById('chatWindow');
   chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
 });
 
-// --- Transformers.js AI ---
-let gptModel;
-async function loadModel() {
-  chatMessages.innerHTML = "Loading PetGPT model...";
-  try {
-    gptModel = await pipeline('text-generation', 'Xenova/gpt2');
-    chatMessages.innerHTML = "PetGPT ready! 🐾";
-  } catch(err) {
-    console.error("Error loading model:", err);
-    chatMessages.innerHTML = "Failed to load PetGPT model. See console.";
-  }
-}
-loadModel();
-
-sendBtn.addEventListener('click', async () => {
+// Chat send
+document.getElementById('sendBtn').addEventListener('click', async () => {
   const text = userInput.value.trim();
-  if (!text || !gptModel) return;
+  if (!text) return;
+  addMessage("You", text);
 
-  const userMsg = document.createElement('div');
-  userMsg.textContent = "You: " + text;
-  chatMessages.appendChild(userMsg);
+  if (text.toLowerCase().startsWith("search:")) {
+    const query = text.replace("search:", "").trim();
+    addMessage("PetGPT", "Searching the web for: " + query);
 
-  // Build a strong domain-specific prompt
-  const prompt = `You are PetGPT, a friendly and knowledgeable pet sitting assistant. 
-  Only answer questions about pet sitting, pet care, booking appointments, and related topics. 
-  Do NOT make up websites, URLs, or personal info. Keep answers concise and helpful.
+    try {
+      const res = await fetch("https://api.duckduckgo.com/?q=" + encodeURIComponent(query) + "&format=json&no_html=1");
+      const data = await res.json();
+      if (data.AbstractText) {
+        addMessage("PetGPT", data.AbstractText);
+      } else {
+        addMessage("PetGPT", "No summary found. Try another query!");
+      }
+    } catch (err) {
+      addMessage("PetGPT", "Search failed: " + err.message);
+    }
 
-  User: ${text}
-  PetGPT:`;
-
-  const output = await gptModel(prompt, {
-    max_new_tokens: 50,
-    temperature: 0.5,
-    repetition_penalty: 1.3
-  });
-
-  let aiResponse = output[0].generated_text.replace(prompt, "").trim();
-
-  // Remove any URLs or email-like patterns
-  aiResponse = aiResponse.replace(/https?:\/\/\S+/gi, "").replace(/\S+@\S+\.\S+/gi, "").trim();
-
-// Fallback if still unrelated
-  if (!/pet|booking|service|care|appointment|animal|dog|cat/i.test(aiResponse)) {
-    aiResponse = "Sorry, I can only answer questions about pet sitting and related services.";
+  } else {
+    if (!generator) {
+      addMessage("PetGPT", "Model not loaded yet!");
+      return;
+    }
+    const output = await generator(text, { max_new_tokens: 50 });
+    addMessage("PetGPT", output[0].generated_text);
   }
+
+  userInput.value = '';
+});
 </script>
+
 </body>
 </html>
