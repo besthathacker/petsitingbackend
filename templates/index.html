@@ -16,12 +16,12 @@
     margin: auto;
   }
   h1 { text-align: center; }
-  
+
   /* Booking Form */
   form { display: flex; flex-direction: column; gap: 0.5rem; }
   input, button { padding: 0.5rem; font-size: 1rem; }
   button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
-  
+
   /* Chat Bubble */
   #chatBubble {
     position: fixed;
@@ -33,7 +33,6 @@
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    z-index: 1000;
   }
   #chatWindow {
     position: fixed;
@@ -48,7 +47,6 @@
     flex-direction: column;
     overflow: hidden;
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
-    z-index: 1000;
   }
   #chatMessages {
     flex: 1;
@@ -73,20 +71,14 @@
     color: white;
     cursor: pointer;
   }
+
+  /* Debug log */
   #debugLog {
-    position: fixed;
-    bottom: 500px;
-    right: 20px;
-    width: 300px;
-    max-height: 200px;
+    font-size: 0.8rem;
+    color: red;
+    max-height: 150px;
     overflow-y: auto;
-    background: #eee;
-    font-size: 0.7rem;
     padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    display: none;
-    z-index: 1000;
   }
 </style>
 </head>
@@ -116,32 +108,33 @@
   </div>
 </div>
 
-<!-- Debug Log -->
+<!-- Debug log -->
 <div id="debugLog"></div>
 
 <script type="module">
 import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
 
+// --- Booking Form ---
 const form = document.getElementById('bookingForm');
 const result = document.getElementById('bookingResult');
 
 form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const formData = new FormData(form);
-    const data = new URLSearchParams(formData);
+  e.preventDefault();
+  const formData = new FormData(form);
+  const data = new URLSearchParams(formData);
 
-    try {
-        const res = await fetch("/booking", { method: "POST", body: data });
-        const text = await res.text();
-        result.textContent = text;
-        form.reset();
-    } catch(err) {
-        result.textContent = "Error sending booking.";
-        console.error(err);
-    }
+  try {
+    const res = await fetch("/booking", { method: "POST", body: data });
+    const text = await res.text();
+    result.textContent = text;
+    form.reset();
+  } catch(err) {
+    result.textContent = "Error sending booking.";
+    console.error(err);
+  }
 });
 
-// Chat Elements
+// --- Chat Bubble & Window ---
 const chatBubble = document.getElementById('chatBubble');
 const chatWindow = document.getElementById('chatWindow');
 const chatMessages = document.getElementById('chatMessages');
@@ -150,65 +143,97 @@ const sendBtn = document.getElementById('sendBtn');
 const debugLog = document.getElementById('debugLog');
 
 chatBubble.addEventListener('click', () => {
-    chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
-    debugLog.style.display = debugLog.style.display === 'block' ? 'none' : 'block';
+  chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
 });
 
-// --- Load GPT-2 ---
+// --- Transformers.js GPT-2 AI ---
 let gptModel;
-let forumTopics = ["forum", "post", "discussion", "thread", "reply", "topic", "question"];
-
 async function loadModel() {
-    try {
-        chatMessages.innerHTML = "Loading AI model...";
-        gptModel = await pipeline('text-generation', 'Xenova/gpt2');
-        chatMessages.innerHTML = "PetGPT ready! 🐾";
-        debugLog.innerHTML += "Model loaded successfully.<br>";
-    } catch(err) {
-        chatMessages.innerHTML = "Failed to load AI model.";
-        debugLog.innerHTML += "Error loading model: " + err + "<br>";
-        console.error(err);
-    }
+  try {
+    debugLog.innerHTML = "Loading GPT-2 model...";
+    gptModel = await pipeline('text-generation', 'Xenova/gpt2');
+    debugLog.innerHTML = "";
+  } catch (err) {
+    debugLog.innerHTML = "Error loading GPT-2: " + err;
+  }
 }
 loadModel();
 
-// --- Generate Response ---
-async function generateResponse(text) {
-    if (!gptModel) return "GPT model not ready.";
+// Forum vs general search
+const forumTopics = ["forum", "discussion", "post"];
+const searchTriggers = ["how", "what", "where", "when", "why", "which"];
 
-    const isForum = forumTopics.some(keyword => text.toLowerCase().includes(keyword));
+// --- Web search function ---
+async function webSearch(query) {
+  try {
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1`;
+    const res = await fetch(url);
+    const data = await res.json();
 
-    try {
-        let prompt = text;
-        if (!isForum) {
-            // You can optionally add web search results here in the prompt
-            prompt = `Answer this question intelligently:\nUser: ${text}\nPetGPT:`;
-        }
-
-        const output = await gptModel(prompt, { max_new_tokens: 50 });
-        return output[0].generated_text.replace(prompt, "").trim();
-    } catch(err) {
-        debugLog.innerHTML += "Error generating response: " + err + "<br>";
-        return "Error generating response.";
+    let snippets = [];
+    if (data.RelatedTopics && data.RelatedTopics.length) {
+      for (let i = 0; i < Math.min(3, data.RelatedTopics.length); i++) {
+        if (data.RelatedTopics[i].Text) snippets.push(data.RelatedTopics[i].Text);
+      }
     }
+    if (!snippets.length && data.AbstractText) snippets.push(data.AbstractText);
+    if (!snippets.length) return "I couldn't find anything useful online.";
+
+    const context = snippets.join(" ");
+    const prompt = `Summarize this information concisely for a helpful answer:\n${context}\nAnswer:`;
+    const output = await gptModel(prompt, { max_new_tokens: 50 });
+    return output[0].generated_text.replace(prompt, "").trim() || "I found some info but can't summarize it clearly.";
+  } catch (err) {
+    debugLog.innerHTML += "Web search error: " + err + "<br>";
+    return "Web search failed.";
+  }
 }
 
-// --- Handle Chat ---
+// --- Generate AI response ---
+async function generateResponse(text) {
+  if (!gptModel) return "GPT model not ready.";
+
+  const isForum = forumTopics.some(k => text.toLowerCase().includes(k));
+  const needsSearch = searchTriggers.some(w => text.toLowerCase().startsWith(w));
+
+  if (needsSearch && !isForum) return await webSearch(text);
+
+  try {
+    let prompt = isForum
+      ? `User asked on the forum: "${text}"\nPetGPT:`
+      : `Answer concisely:\nUser: ${text}\nPetGPT:`;
+
+    const output = await gptModel(prompt, { max_new_tokens: 50 });
+    let response = output[0].generated_text.replace(prompt, "").trim();
+
+    const stopChars = [".", "!", "\n"];
+    let indices = stopChars.map(c => response.indexOf(c)).filter(i => i >= 0);
+    if (indices.length) response = response.slice(0, Math.min(...indices) + 1);
+
+    return response || "Hmm, I’m not sure what to say.";
+  } catch(err) {
+    debugLog.innerHTML += "Error generating response: " + err + "<br>";
+    return "Error generating response.";
+  }
+}
+
+// --- Send button ---
 sendBtn.addEventListener('click', async () => {
-    const text = userInput.value.trim();
-    if (!text) return;
+  const text = userInput.value.trim();
+  if (!text) return;
 
-    const userMsg = document.createElement('div');
-    userMsg.textContent = "You: " + text;
-    chatMessages.appendChild(userMsg);
+  const userMsg = document.createElement('div');
+  userMsg.textContent = "You: " + text;
+  chatMessages.appendChild(userMsg);
 
-    const response = await generateResponse(text);
-    const aiMsg = document.createElement('div');
-    aiMsg.textContent = "PetGPT: " + response;
-    chatMessages.appendChild(aiMsg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  const aiText = await generateResponse(text);
 
-    userInput.value = '';
+  const aiMsg = document.createElement('div');
+  aiMsg.textContent = "PetGPT: " + aiText;
+  chatMessages.appendChild(aiMsg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  userInput.value = '';
 });
 </script>
 
