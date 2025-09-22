@@ -16,12 +16,12 @@
     margin: auto;
   }
   h1 { text-align: center; }
-
+  
   /* Booking Form */
   form { display: flex; flex-direction: column; gap: 0.5rem; }
   input, button { padding: 0.5rem; font-size: 1rem; }
   button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
-
+  
   /* Chat Bubble */
   #chatBubble {
     position: fixed;
@@ -72,13 +72,18 @@
     cursor: pointer;
   }
 
-  /* Debug log */
-  #debugLog {
-    font-size: 0.8rem;
+  #debug {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    font-size: 0.7rem;
     color: red;
-    max-height: 150px;
+    background: #fff;
+    padding: 0.2rem 0.5rem;
+    max-height: 80px;
     overflow-y: auto;
-    padding: 0.5rem;
+    border-top: 1px solid #ccc;
+    width: 100%;
   }
 </style>
 </head>
@@ -108,8 +113,8 @@
   </div>
 </div>
 
-<!-- Debug log -->
-<div id="debugLog"></div>
+<!-- Debug Output -->
+<div id="debug"></div>
 
 <script type="module">
 import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
@@ -124,7 +129,10 @@ form.addEventListener('submit', async (e) => {
   const data = new URLSearchParams(formData);
 
   try {
-    const res = await fetch("/booking", { method: "POST", body: data });
+    const res = await fetch("/booking", {
+      method: "POST",
+      body: data
+    });
     const text = await res.text();
     result.textContent = text;
     form.reset();
@@ -140,98 +148,59 @@ const chatWindow = document.getElementById('chatWindow');
 const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
-const debugLog = document.getElementById('debugLog');
+const debug = document.getElementById('debug');
 
 chatBubble.addEventListener('click', () => {
   chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
 });
 
-// --- Transformers.js GPT-2 AI ---
+// --- Transformers.js AI ---
 let gptModel;
 async function loadModel() {
   try {
-    debugLog.innerHTML = "Loading GPT-2 model...";
+    chatMessages.innerHTML = "Loading AI model...";
     gptModel = await pipeline('text-generation', 'Xenova/gpt2');
-    debugLog.innerHTML = "";
-  } catch (err) {
-    debugLog.innerHTML = "Error loading GPT-2: " + err;
+    chatMessages.innerHTML = "PetGPT ready! 🐾";
+  } catch(err) {
+    chatMessages.innerHTML = "Failed to load AI model.";
+    debug.textContent += "Error loading GPT-2: " + err + "\n";
   }
 }
 loadModel();
 
-// Forum vs general search
-const forumTopics = ["forum", "discussion", "post"];
-const searchTriggers = ["how", "what", "where", "when", "why", "which"];
-
-// --- Web search function ---
-async function webSearch(query) {
-  try {
-    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    let snippets = [];
-    if (data.RelatedTopics && data.RelatedTopics.length) {
-      for (let i = 0; i < Math.min(3, data.RelatedTopics.length); i++) {
-        if (data.RelatedTopics[i].Text) snippets.push(data.RelatedTopics[i].Text);
-      }
-    }
-    if (!snippets.length && data.AbstractText) snippets.push(data.AbstractText);
-    if (!snippets.length) return "I couldn't find anything useful online.";
-
-    const context = snippets.join(" ");
-    const prompt = `Summarize this information concisely for a helpful answer:\n${context}\nAnswer:`;
-    const output = await gptModel(prompt, { max_new_tokens: 50 });
-    return output[0].generated_text.replace(prompt, "").trim() || "I found some info but can't summarize it clearly.";
-  } catch (err) {
-    debugLog.innerHTML += "Web search error: " + err + "<br>";
-    return "Web search failed.";
-  }
-}
-
-// --- Generate AI response ---
-async function generateResponse(text) {
-  if (!gptModel) return "GPT model not ready.";
-
-  const isForum = forumTopics.some(k => text.toLowerCase().includes(k));
-  const needsSearch = searchTriggers.some(w => text.toLowerCase().startsWith(w));
-
-  if (needsSearch && !isForum) return await webSearch(text);
-
-  try {
-    let prompt = isForum
-      ? `User asked on the forum: "${text}"\nPetGPT:`
-      : `Answer concisely:\nUser: ${text}\nPetGPT:`;
-
-    const output = await gptModel(prompt, { max_new_tokens: 50 });
-    let response = output[0].generated_text.replace(prompt, "").trim();
-
-    const stopChars = [".", "!", "\n"];
-    let indices = stopChars.map(c => response.indexOf(c)).filter(i => i >= 0);
-    if (indices.length) response = response.slice(0, Math.min(...indices) + 1);
-
-    return response || "Hmm, I’m not sure what to say.";
-  } catch(err) {
-    debugLog.innerHTML += "Error generating response: " + err + "<br>";
-    return "Error generating response.";
-  }
-}
-
-// --- Send button ---
 sendBtn.addEventListener('click', async () => {
   const text = userInput.value.trim();
-  if (!text) return;
+  if (!text || !gptModel) return;
 
   const userMsg = document.createElement('div');
   userMsg.textContent = "You: " + text;
   chatMessages.appendChild(userMsg);
 
-  const aiText = await generateResponse(text);
+  try {
+    // Structured prompt to guide responses
+    const prompt = `You are PetGPT, a friendly pet sitting assistant. Respond politely and informatively.
 
-  const aiMsg = document.createElement('div');
-  aiMsg.textContent = "PetGPT: " + aiText;
-  chatMessages.appendChild(aiMsg);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+User: ${text}
+PetGPT:`;
+
+    const output = await gptModel(prompt, {
+      max_new_tokens: 100,
+      return_full_text: false,
+      repetition_penalty: 1.2,
+      temperature: 0.7,
+      top_p: 0.9
+    });
+
+    let aiResponse = output[0].generated_text || "";
+    aiResponse = aiResponse.replace(prompt, "").trim();
+
+    const aiMsg = document.createElement('div');
+    aiMsg.textContent = "PetGPT: " + aiResponse;
+    chatMessages.appendChild(aiMsg);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    } catch(err) {
+    debug.textContent += "AI Generation Error: " + err + "\n";
+  }
 
   userInput.value = '';
 });
