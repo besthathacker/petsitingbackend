@@ -99,96 +99,80 @@
   </div>
 </div>
 
+<!-- Transformers.js GPT-2 -->
 <script type="module">
-  import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.3';
-</script>
-<script>
-  // --- Booking Form ---
-  const form = document.getElementById('bookingForm');
-  const result = document.getElementById('bookingResult');
+import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const formData = new FormData(form);
-    const data = new URLSearchParams(formData);
-
-    try {
-      const res = await fetch("/booking", {
-        method: "POST",
-        body: data
-      });
-      const text = await res.text();
-      result.textContent = text;
-      form.reset();
-    } catch(err) {
-      result.textContent = "Error sending booking.";
-      console.error(err);
-    }
-  });
-
-  // --- Chat Bubble & Window ---
-  const chatBubble = document.getElementById('chatBubble');
-  const chatWindow = document.getElementById('chatWindow');
+async function loadAI() {
   const chatMessages = document.getElementById('chatMessages');
-  const userInput = document.getElementById('userInput');
-  const sendBtn = document.getElementById('sendBtn');
 
-  chatBubble.addEventListener('click', () => {
-    chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
-  });
+  try {
+    chatMessages.innerHTML = "Loading GPT-2 model...";
+    const pipe = await pipeline('text-generation', 'gpt2');
+    chatMessages.innerHTML = "PetGPT ready! 🐾";
 
-  // --- Transformers.js AI ---
-  const chatMessages = document.getElementById('chatMessages');
-  const userInput = document.getElementById('userInput');
-  const sendBtn = document.getElementById('sendBtn');
+    document.getElementById('sendBtn').addEventListener('click', async () => {
+      const text = document.getElementById('userInput').value.trim();
+      if (!text) return;
 
-  let pipe = null;
+      const userMsg = document.createElement('div');
+      userMsg.textContent = "You: " + text;
+      chatMessages.appendChild(userMsg);
 
-  async function loadModel() {
-    chatMessages.innerHTML = "Loading AI model...";
-    try {
-      pipe = await pipeline('text-generation', 'gpt2');
-      chatMessages.innerHTML = "PetGPT ready! 🐾";
-    } catch (err) {
-      chatMessages.innerHTML = "Error loading model:<br>" + err.toString();
-      console.error("Model load error:", err);
-    }
+      try {
+        const output = await pipe(text, { max_new_tokens: 50 });
+        const aiMsg = document.createElement('div');
+        aiMsg.textContent = "PetGPT: " + output[0].generated_text.replace(text, "");
+        chatMessages.appendChild(aiMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      } catch(innerErr) {
+        console.error("Generation error:", innerErr);
+        const errMsg = document.createElement('div');
+        errMsg.textContent = "PetGPT error: " + innerErr;
+        chatMessages.appendChild(errMsg);
+      }
+
+      document.getElementById('userInput').value = '';
+    });
+
+  } catch(err) {
+    console.error("Model load error:", err);
+    chatMessages.innerHTML = "Failed to load GPT-2: " + err;
   }
+}
 
-  loadModel();
+loadAI();
 
-  sendBtn.addEventListener('click', async () => {
-    const text = userInput.value.trim();
-    if (!text) return;
+// --- Booking Form ---
+const form = document.getElementById('bookingForm');
+const result = document.getElementById('bookingResult');
 
-    const userMsg = document.createElement('div');
-    userMsg.textContent = "You: " + text;
-    chatMessages.appendChild(userMsg);
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const data = new URLSearchParams(formData);
 
-    if (!pipe) {
-      const errorMsg = document.createElement('div');
-      errorMsg.textContent = "Error: Model not loaded.";
-      chatMessages.appendChild(errorMsg);
-      return;
-    }
+  try {
+    const res = await fetch("/booking", {
+      method: "POST",
+      body: data
+    });
+    const text = await res.text();
+    result.textContent = text;
+    form.reset();
+  } catch(err) {
+    result.textContent = "Error sending booking.";
+    console.error(err);
+  }
+});
 
-    try {
-      const output = await pipe(text, { max_new_tokens: 50 });
-      const aiResponse = output[0].generated_text.replace(text, "");
-
-      const aiMsg = document.createElement('div');
-      aiMsg.textContent = "PetGPT: " + aiResponse;
-      chatMessages.appendChild(aiMsg);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    } catch (err) {
-      const errorMsg = document.createElement('div');
-      errorMsg.textContent = "Error during generation:<br>" + err.toString();
-      chatMessages.appendChild(errorMsg);
-      console.error("Generation error:", err);
-    }
-
-    userInput.value = '';
-  });
+// --- Chat Bubble toggle ---
+const chatBubble = document.getElementById('chatBubble');
+const chatWindow = document.getElementById('chatWindow');
+chatBubble.addEventListener('click', () => {
+  chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+});
 </script>
+
 </body>
 </html>
