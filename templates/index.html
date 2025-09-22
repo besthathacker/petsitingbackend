@@ -71,20 +71,6 @@
     color: white;
     cursor: pointer;
   }
-
-  #debug {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    font-size: 0.7rem;
-    color: red;
-    background: #fff;
-    padding: 0.2rem 0.5rem;
-    max-height: 80px;
-    overflow-y: auto;
-    border-top: 1px solid #ccc;
-    width: 100%;
-  }
 </style>
 </head>
 <body>
@@ -112,9 +98,6 @@
     <button id="sendBtn">Send</button>
   </div>
 </div>
-
-<!-- Debug Output -->
-<div id="debug"></div>
 
 <script type="module">
 import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
@@ -148,7 +131,6 @@ const chatWindow = document.getElementById('chatWindow');
 const chatMessages = document.getElementById('chatMessages');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
-const debug = document.getElementById('debug');
 
 chatBubble.addEventListener('click', () => {
   chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
@@ -157,13 +139,13 @@ chatBubble.addEventListener('click', () => {
 // --- Transformers.js AI ---
 let gptModel;
 async function loadModel() {
+  chatMessages.innerHTML = "Loading PetGPT model...";
   try {
-    chatMessages.innerHTML = "Loading AI model...";
     gptModel = await pipeline('text-generation', 'Xenova/gpt2');
     chatMessages.innerHTML = "PetGPT ready! 🐾";
   } catch(err) {
-    chatMessages.innerHTML = "Failed to load AI model.";
-    debug.textContent += "Error loading GPT-2: " + err + "\n";
+    console.error("Error loading model:", err);
+    chatMessages.innerHTML = "Failed to load PetGPT model. See console.";
   }
 }
 loadModel();
@@ -176,33 +158,33 @@ sendBtn.addEventListener('click', async () => {
   userMsg.textContent = "You: " + text;
   chatMessages.appendChild(userMsg);
 
+  // Build a strong domain-specific prompt
+  const prompt = `You are PetGPT, a friendly and knowledgeable pet sitting assistant. Only answer questions about pet sitting, pet care, booking appointments, and related topics. Keep answers concise and helpful.\n\nUser: ${text}\nPetGPT:`;
+
   try {
-    // Structured prompt to guide responses
-    const prompt = `You are PetGPT, a friendly pet sitting assistant. Respond politely and informatively.
-
-User: ${text}
-PetGPT:`;
-
     const output = await gptModel(prompt, {
-      max_new_tokens: 100,
-      return_full_text: false,
-      repetition_penalty: 1.2,
-      temperature: 0.7,
-      top_p: 0.9
+      max_new_tokens: 50,
+      temperature: 0.6,
+      repetition_penalty: 1.2
     });
+    let aiResponse = output[0].generated_text.replace(prompt, "").trim();
 
-    let aiResponse = output[0].generated_text || "";
-    aiResponse = aiResponse.replace(prompt, "").trim();
+    // Optional: on-topic check
+    if (!/pet|booking|service|care/i.test(aiResponse)) {
+      aiResponse = "Sorry, I can only answer questions about pet sitting and related services.";
+    }
 
     const aiMsg = document.createElement('div');
     aiMsg.textContent = "PetGPT: " + aiResponse;
     chatMessages.appendChild(aiMsg);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    } catch(err) {
-    debug.textContent += "AI Generation Error: " + err + "\n";
+    userInput.value = '';
+  } catch(err) {
+    console.error("Error generating response:", err);
+    const aiMsg = document.createElement('div');
+    aiMsg.textContent = "PetGPT: Sorry, I couldn't process your request.";
+    chatMessages.appendChild(aiMsg);
   }
-
-  userInput.value = '';
 });
 </script>
 
