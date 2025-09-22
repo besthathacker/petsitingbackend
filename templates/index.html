@@ -5,48 +5,93 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dream Team Pet Sitting</title>
 <style>
+  /* --- General --- */
   body {
     font-family: Arial, sans-serif;
-    margin: 0; padding: 0;
+    margin: 0;
+    padding: 0;
     background-color: #f0f8ff;
   }
   .container {
-    padding: 1rem;
+    padding: 2rem;
     max-width: 500px;
-    margin: auto;
+    margin: 2rem auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
   }
-  h1 { text-align: center; }
-  
-  /* Booking Form */
-  form { display: flex; flex-direction: column; gap: 0.5rem; }
-  input, button { padding: 0.5rem; font-size: 1rem; }
-  button { cursor: pointer; background-color: #4CAF50; color: white; border: none; }
-  
-  /* Chat Bubble */
+  h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  /* --- Booking Form --- */
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  input, button {
+    padding: 0.75rem;
+    font-size: 1rem;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  button {
+    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    transition: background 0.3s;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  #bookingResult, #debugLog {
+    margin-top: 1rem;
+    font-weight: bold;
+    word-break: break-word;
+  }
+  #debugLog {
+    font-size: 0.8rem;
+    color: red;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+
+  /* --- Chat Bubble --- */
   #chatBubble {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 60px; height: 60px;
+    width: 60px;
+    height: 60px;
     background-color: #ffcc00;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 1000;
+    font-size: 1.5rem;
   }
+
+  /* --- Chat Window --- */
   #chatWindow {
     position: fixed;
     bottom: 90px;
     right: 20px;
-    width: 300px;
-    max-height: 400px;
+    width: 320px;
+    max-height: 450px;
     background-color: white;
     border: 1px solid #ccc;
-    border-radius: 8px;
+    border-radius: 10px;
     display: none;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 999;
   }
   #chatMessages {
     flex: 1;
@@ -63,13 +108,31 @@
     padding: 0.5rem;
     border: none;
     font-size: 1rem;
+    outline: none;
   }
   #sendBtn {
-    padding: 0.5rem;
+    padding: 0.5rem 1rem;
     border: none;
     background-color: #4CAF50;
     color: white;
     cursor: pointer;
+    transition: background 0.3s;
+  }
+  #sendBtn:hover {
+    background-color: #45a049;
+  }
+
+  /* --- Responsive adjustments --- */
+  @media (max-width: 400px) {
+    .container {
+      margin: 1rem;
+      padding: 1rem;
+    }
+    #chatWindow {
+      width: 90%;
+      right: 5%;
+      bottom: 80px;
+    }
   }
 </style>
 </head>
@@ -85,6 +148,7 @@
     <button type="submit">Book Now</button>
   </form>
   <div id="bookingResult"></div>
+  <div id="debugLog"></div>
 </div>
 
 <!-- Chat Bubble -->
@@ -99,49 +163,10 @@
   </div>
 </div>
 
-<!-- Transformers.js GPT-2 -->
 <script type="module">
 import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@latest/dist/transformers.min.js';
 
-async function loadAI() {
-  const chatMessages = document.getElementById('chatMessages');
-
-  try {
-    chatMessages.innerHTML = "Loading GPT-2 model...";
-    const pipe = await pipeline('text-generation', 'Xenova/gpt2');
-    chatMessages.innerHTML = "PetGPT ready! 🐾";
-
-    document.getElementById('sendBtn').addEventListener('click', async () => {
-      const text = document.getElementById('userInput').value.trim();
-      if (!text) return;
-
-      const userMsg = document.createElement('div');
-      userMsg.textContent = "You: " + text;
-      chatMessages.appendChild(userMsg);
-
-      try {
-        const output = await pipe(text, { max_new_tokens: 50 });
-        const aiMsg = document.createElement('div');
-        aiMsg.textContent = "PetGPT: " + output[0].generated_text.replace(text, "");
-        chatMessages.appendChild(aiMsg);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      } catch(innerErr) {
-        console.error("Generation error:", innerErr);
-        const errMsg = document.createElement('div');
-        errMsg.textContent = "PetGPT error: " + innerErr;
-        chatMessages.appendChild(errMsg);
-      }
-
-      document.getElementById('userInput').value = '';
-    });
-
-  } catch(err) {
-    console.error("Model load error:", err);
-    chatMessages.innerHTML = "Failed to load GPT-2: " + err;
-  }
-}
-
-loadAI();
+const debugLog = document.getElementById('debugLog');
 
 // --- Booking Form ---
 const form = document.getElementById('bookingForm');
@@ -153,25 +178,84 @@ form.addEventListener('submit', async (e) => {
   const data = new URLSearchParams(formData);
 
   try {
-    const res = await fetch("/booking", {
-      method: "POST",
-      body: data
-    });
+    const res = await fetch("/booking", { method:"POST", body:data });
     const text = await res.text();
     result.textContent = text;
     form.reset();
   } catch(err) {
     result.textContent = "Error sending booking.";
-    console.error(err);
+    debugLog.textContent += "\nBooking Error: " + err;
   }
 });
 
-// --- Chat Bubble toggle ---
+// --- Chat Bubble ---
 const chatBubble = document.getElementById('chatBubble');
 const chatWindow = document.getElementById('chatWindow');
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+
 chatBubble.addEventListener('click', () => {
   chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
 });
+
+// --- Transformers.js AI ---
+let gptModel;
+
+async function loadModel() {
+  try {
+    debugLog.textContent = "Loading GPT-2 model...";
+    gptModel = await pipeline('text-generation', 'Xenova/gpt2');
+    debugLog.textContent = "PetGPT ready! 🐾";
+  } catch(e) {
+    debugLog.textContent = "Model load error: " + e;
+    console.error(e);
+  }
+}
+
+loadModel();
+
+async function generateResponse(text) {
+  if (!gptModel) return "Model not loaded yet.";
+  try {
+    const output = await gptModel(text, { max_new_tokens: 50 });
+    return output[0].generated_text.replace(text, "");
+  } catch(e) {
+    debugLog.textContent += "\nGeneration error: " + e;
+    return "PetGPT had trouble generating a response.";
+  }
+}
+
+// --- Send message ---
+sendBtn.addEventListener('click', async () => {
+  const text = userInput.value.trim();
+  if (!text) return;
+
+  const userMsg = document.createElement('div');
+  userMsg.textContent = "You: " + text;
+  chatMessages.appendChild(userMsg);
+
+  const response = await generateResponse(text);
+
+  const aiMsg = document.createElement('div');
+  aiMsg.textContent = "PetGPT: " + response;
+  chatMessages.appendChild(aiMsg);
+
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  userInput.value = '';
+});
+
+// --- Optional Web Search ---
+async function webSearch(query) {
+  try {
+    const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
+    const data = await res.json();
+    return data.RelatedTopics?.[0]?.Text || "No results found.";
+  } catch(e) {
+    debugLog.textContent += "\nWeb search error: " + e;
+    return "Search failed.";
+  }
+}
 </script>
 
 </body>
